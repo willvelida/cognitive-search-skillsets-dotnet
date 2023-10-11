@@ -37,6 +37,123 @@ catch (Exception ex)
 }
 
 // Step 2: Create a skillset
+// Ocr
+List<InputFieldMappingEntry> ocrInputs = new List<InputFieldMappingEntry>();
+ocrInputs.Add(new InputFieldMappingEntry("image")
+{
+    Source = "/document/normalized_images/*"
+});
+
+List<OutputFieldMappingEntry> ocrOutputs = new List<OutputFieldMappingEntry>();
+ocrOutputs.Add(new OutputFieldMappingEntry("text")
+{
+    TargetName = "text"
+});
+
+OcrSkill ocrSkill = new OcrSkill(ocrInputs, ocrOutputs)
+{
+    Description = "Extract text (plain and structured from image",
+    Context = "/document/normalized_images/*",
+    DefaultLanguageCode = OcrSkillLanguage.En,
+    ShouldDetectOrientation = true,
+};
+
+// Merge Skill
+List<InputFieldMappingEntry> mergeSkillInput = new List<InputFieldMappingEntry>();
+mergeSkillInput.Add(new InputFieldMappingEntry("text")
+{
+    Source = "/document/content"
+});
+mergeSkillInput.Add(new InputFieldMappingEntry("itemsToInsert")
+{
+    Source = "/document/normalized_images/*/text"
+});
+mergeSkillInput.Add(new InputFieldMappingEntry("offsets")
+{
+    Source = "/document/normalized_images/*/contentOffset"
+});
+
+List<OutputFieldMappingEntry> mergeSkillOutput = new List<OutputFieldMappingEntry>();
+mergeSkillOutput.Add(new OutputFieldMappingEntry("mergedText")
+{
+    TargetName = "merged_text"
+});
+
+MergeSkill mergeSkill = new MergeSkill(mergeSkillInput, mergeSkillOutput)
+{
+    Description = "Create merged_text which includes all the textual representation of each image inserted at the right location in the content field.",
+    Context = "/document",
+    InsertPreTag = " ",
+    InsertPostTag = " "
+};
+
+// Language detection skill
+List<InputFieldMappingEntry> detectInput = new List<InputFieldMappingEntry>();
+detectInput.Add(new InputFieldMappingEntry("text")
+{
+    Source = "/document/merged_text"
+});
+
+List<OutputFieldMappingEntry> detectOutput = new List<OutputFieldMappingEntry>();
+detectOutput.Add(new OutputFieldMappingEntry("languageCode")
+{
+    TargetName = "languageCode"
+});
+
+LanguageDetectionSkill languageDetectionSkill = new LanguageDetectionSkill(detectInput, detectOutput)
+{
+    Description = "Detect the language used in the document",
+    Context = "/document"
+};
+
+// Text Split Skill
+List<InputFieldMappingEntry> splitInput = new List<InputFieldMappingEntry>();
+splitInput.Add(new InputFieldMappingEntry("text")
+{
+    Source = "/document/merged_text"
+});
+splitInput.Add(new InputFieldMappingEntry("languageCode")
+{
+    Source = "/document/languageCode"
+});
+
+List<OutputFieldMappingEntry> splitOutput = new List<OutputFieldMappingEntry>();
+splitOutput.Add(new OutputFieldMappingEntry("textItems")
+{
+    TargetName = "pages"
+});
+
+SplitSkill splitSkill = new SplitSkill(splitInput, splitOutput)
+{
+    Description = "Split content into pages",
+    Context = "/document",
+    TextSplitMode = TextSplitMode.Pages,
+    MaximumPageLength = 4000,
+    DefaultLanguageCode = SplitSkillLanguage.En
+};
+
+// Entity Recognition
+List<InputFieldMappingEntry> entityInput = new List<InputFieldMappingEntry>();
+entityInput.Add(new InputFieldMappingEntry("text")
+{
+    Source = "/document/pages/*"
+});
+
+List<OutputFieldMappingEntry> entityOutput = new List<OutputFieldMappingEntry>();
+entityOutput.Add(new OutputFieldMappingEntry("organizations")
+{
+    TargetName = "organizations"
+});
+
+EntityRecognitionSkill entityRecognitionSkill = new EntityRecognitionSkill(entityInput, entityOutput)
+{
+    DefaultLanguageCode = EntityRecognitionSkillLanguage.En,
+    Description = "Recognize Organizations",
+    Context = "/document/pages/*"
+};
+entityRecognitionSkill.Categories.Add(EntityCategory.Organization);
+
+// Key phrase extraction
 List<InputFieldMappingEntry> inputFieldMappingEntries = new List<InputFieldMappingEntry>();
 inputFieldMappingEntries.Add(new InputFieldMappingEntry("text")
 {
@@ -61,6 +178,11 @@ KeyPhraseExtractionSkill keyPhraseExtractionSkill = new KeyPhraseExtractionSkill
 };
 
 List<SearchIndexerSkill> skills = new List<SearchIndexerSkill>();
+skills.Add(ocrSkill);
+skills.Add(mergeSkill);
+skills.Add(languageDetectionSkill);
+skills.Add(splitSkill);
+skills.Add(entityRecognitionSkill);
 skills.Add(keyPhraseExtractionSkill);
 
 // Creating a skillset using the built in skillset (not specifying an AI services key)
@@ -185,6 +307,7 @@ try
         case IndexerStatus.Running:
             Console.WriteLine("The Indexer is running!");
             break;
+
         default:
             Console.WriteLine("No information available");
             break;

@@ -4,17 +4,8 @@ param suffix string = uniqueString(resourceGroup().id)
 @description('The name of the Azure Cognitive Search service that will be deployed')
 param searchServiceName string = 'search-${suffix}-dev'
 
-@description('The name of the Cognitive Service that will be deployed.')
-param cognitiveServiceName string = 'cog-${suffix}-dev'
-
 @description('The pricing tier of the search service that will be deployed. Default is free')
-param searchSku string = 'free'
-
-@description('The SKU that will be applied to the Cognitive Service. Default is S0')
-@allowed([
-  'S0'
-])
-param cognitiveSku string = 'S0'
+param searchSku string = 'basic'
 
 @description('The location of the Azure Cognitive Search service that will be deployed. Default is location of the resource group')
 param location string = resourceGroup().location
@@ -43,20 +34,6 @@ resource searchService 'Microsoft.Search/searchServices@2022-09-01' = {
   properties: {
     replicaCount: replicaCount
     partitionCount: partitionCount
-  }
-}
-
-resource cognitiveSearch 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
-  name: cognitiveServiceName
-  location: location
-  sku: {
-    name: cognitiveSku
-  }
-  kind: 'CognitiveServices'
-  properties: {
-    apiProperties: {
-      statisticsEnabled: false
-    }
   }
 }
 
